@@ -89,44 +89,53 @@ exports.buyDocumentLifetime = functions.https.onCall((data, context) => {
         throwHttpsError('invalid-argument', "purchaseToken can't be blank");
     }
 
+    // TODO: check that purchase token is unique
+
     const documentRef = firestore.doc(`documents/${documentKey}`);
 
     return documentRef.get().then(documentSnapshot => {
+
+        console.log("Document found");
+
         if (!documentSnapshot.exists) {
+            console.log("Document isn't exist");
             throwHttpsError('not-found', "Document not found");
             return "error";
         } else {
+            console.log("Document exist");
 
             let receipt = {
                 packageName: "io.anonymous.storage",
                 productId: sku,
-                purchaseToken: "purchaseToken"
+                purchaseToken: purchaseToken
             };
 
             return purchaseVerifier.verifyINAPP(receipt)
-                .then(function (response) {
+                .then(response => {
+                    console.log("Purchase verified");
                     // Here for example you can chain your work if purchase is valid
                     // eg. add coins to the user profile, etc
                     // If you are new to promises API
                     // Awesome docs: https://developers.google.com/web/fundamentals/primers/promises
 
-                    // TODO: extend document lifetime
                     return documentRef.update({DB_DOCUMENTS_FIELD_DOCUMENT_PURCHASING_TYPE: 1024}).then(writeResult => {
-                        return console.log(`Document (${documentKey}) update: ${writeResult}`);
+                        console.log(`Document (${documentKey}) update: ${writeResult}`);
+                        return "success"
                     }).catch(error => {
-                        return console.log(`Document (${documentKey} update error: ${error})`);
+                        console.log(`Document (${documentKey} update error: ${error})`);
+                        return throwHttpsError('unknown', `${error}`)
                     });
                 })
-                .catch(function (error) {
+                .catch(error => {
+                    console.log(`Purchase verification error, ${error.errorMessage}`);
                     // Purchase is not valid or API error
                     // See possible error messages below
-                    throwHttpsError(functions.https.errorCodeMap.aborted, "purchase is not valid");
-                    return "error";
+                    throwHttpsError('aborted', "purchase is not valid");
                 });
         }
     })
-        .catch(function (error) {
-            throwHttpsError(unknown, "Unknown error");
+        .catch(error => {
+            throwHttpsError('unknown', `${error}`);
         });
 });
 
